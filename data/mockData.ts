@@ -1,0 +1,163 @@
+import { Restaurant, Dish, Biker, DeliveryRequest } from '@/types';
+
+export const mockRestaurants: Restaurant[] = [
+  {
+    id: '1',
+    name: 'Burger Palace',
+    cuisine: 'American',
+    rating: 4.5,
+    distance: 0.8,
+    deliveryTime: '15-25 min',
+    image: 'https://images.pexels.com/photos/1639562/pexels-photo-1639562.jpeg?auto=compress&cs=tinysrgb&w=800',
+    isOpen: true,
+  },
+  {
+    id: '2',
+    name: 'Pasta House',
+    cuisine: 'Italian',
+    rating: 4.7,
+    distance: 1.2,
+    deliveryTime: '20-30 min',
+    image: 'https://images.pexels.com/photos/1279330/pexels-photo-1279330.jpeg?auto=compress&cs=tinysrgb&w=800',
+    isOpen: true,
+  },
+  {
+    id: '3',
+    name: 'Sushi Express',
+    cuisine: 'Japanese',
+    rating: 4.8,
+    distance: 1.5,
+    deliveryTime: '25-35 min',
+    image: 'https://images.pexels.com/photos/357756/pexels-photo-357756.jpeg?auto=compress&cs=tinysrgb&w=800',
+    isOpen: true,
+  },
+  {
+    id: '4',
+    name: 'Taco Fiesta',
+    cuisine: 'Mexican',
+    rating: 4.3,
+    distance: 2.1,
+    deliveryTime: '30-40 min',
+    image: 'https://images.pexels.com/photos/461198/pexels-photo-461198.jpeg?auto=compress&cs=tinysrgb&w=800',
+    isOpen: false,
+  },
+  {
+    id: '5',
+    name: 'Dragon Wok',
+    cuisine: 'Chinese',
+    rating: 4.6,
+    distance: 1.8,
+    deliveryTime: '20-30 min',
+    image: 'https://images.pexels.com/photos/1410235/pexels-photo-1410235.jpeg?auto=compress&cs=tinysrgb&w=800',
+    isOpen: true,
+  },
+];
+
+export const mockDishes: Record<string, Dish[]> = {
+  '1': [
+    {
+      id: 'd1',
+      restaurantId: '1',
+      name: 'Classic Cheeseburger',
+      description: 'Beef patty, cheddar, lettuce, tomato, special sauce',
+      price: 12.99,
+      image: 'https://images.pexels.com/photos/1639557/pexels-photo-1639557.jpeg?auto=compress&cs=tinysrgb&w=600',
+      category: 'Burgers',
+    },
+    {
+      id: 'd2',
+      restaurantId: '1',
+      name: 'Bacon BBQ Burger',
+      description: 'Double beef, crispy bacon, BBQ sauce, onion rings',
+      price: 15.99,
+      image: 'https://images.pexels.com/photos/1633578/pexels-photo-1633578.jpeg?auto=compress&cs=tinysrgb&w=600',
+      category: 'Burgers',
+    },
+    {
+      id: 'd3',
+      restaurantId: '1',
+      name: 'Crispy Fries',
+      description: 'Golden crispy fries with sea salt',
+      price: 4.99,
+      image: 'https://images.pexels.com/photos/1893556/pexels-photo-1893556.jpeg?auto=compress&cs=tinysrgb&w=600',
+      category: 'Sides',
+    },
+    {
+      id: 'd4',
+      restaurantId: '1',
+      name: 'Onion Rings',
+      description: 'Crispy battered onion rings with ranch',
+      price: 5.99,
+      image: 'https://images.pexels.com/photos/6046493/pexels-photo-6046493.jpeg?auto=compress&cs=tinysrgb&w=600',
+      category: 'Sides',
+    },
+  ],
+  '2': [
+    {
+      id: 'd5',
+      restaurantId: '2',
+      name: 'Carbonara',
+      description: 'Spaghetti with bacon, egg, parmesan, black pepper',
+      price: 14.99,
+      image: 'https://images.pexels.com/photos/1279330/pexels-photo-1279330.jpeg?auto=compress&cs=tinysrgb&w=600',
+      category: 'Pasta',
+    },
+    {
+      id: 'd6',
+      restaurantId: '2',
+      name: 'Margherita Pizza',
+      description: 'Fresh mozzarella, basil, tomato sauce',
+      price: 13.99,
+      image: 'https://images.pexels.com/photos/2147491/pexels-photo-2147491.jpeg?auto=compress&cs=tinysrgb&w=600',
+      category: 'Pizza',
+    },
+    {
+      id: 'd7',
+      restaurantId: '2',
+      name: 'Lasagna',
+      description: 'Layered pasta with beef, ricotta, mozzarella',
+      price: 16.99,
+      image: 'https://images.pexels.com/photos/4079520/pexels-photo-4079520.jpeg?auto=compress&cs=tinysrgb&w=600',
+      category: 'Pasta',
+    },
+  ],
+};
+
+export const mockBiker: Biker = {
+  id: 'b1',
+  name: 'Marcus Johnson',
+  photo: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=400',
+  bikePlate: 'MTR-8542',
+  rating: 4.9,
+};
+
+export const mockDeliveryRequests: DeliveryRequest[] = [
+  {
+    id: 'dr1',
+    restaurantName: 'Burger Palace',
+    restaurantAddress: '123 Main St',
+    customerName: 'Sarah Williams',
+    customerAddress: '456 Oak Avenue, Apt 3B',
+    pickupDistance: 0.5,
+    dropoffDistance: 1.2,
+    estimatedEarnings: 8.50,
+    items: [],
+    status: 'pending',
+    timestamp: new Date().toISOString(),
+  },
+  {
+    id: 'dr2',
+    restaurantName: 'Sushi Express',
+    restaurantAddress: '789 Pine Road',
+    customerName: 'Michael Chen',
+    customerAddress: '321 Elm Street',
+    pickupDistance: 0.8,
+    dropoffDistance: 2.3,
+    estimatedEarnings: 12.00,
+    items: [],
+    status: 'pending',
+    timestamp: new Date().toISOString(),
+  },
+];
+
+export const mockAddress = '456 Oak Avenue, Apt 3B';
