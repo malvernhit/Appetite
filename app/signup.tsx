@@ -125,23 +125,16 @@ export default function SignUpScreen() {
       if (authError) throw authError;
 
       if (authData.user) {
-        const { error: userError } = await supabase.from('users').insert({
-          id: authData.user.id,
-          email: formData.email.trim(),
-          full_name: formData.fullName.trim(),
-          phone: formData.phone.trim() || null,
-          user_mode: role,
-        });
-
-        if (userError) throw userError;
-
         if (role === 'biker') {
           const { error: bikerError } = await supabase.from('bikers').insert({
             id: authData.user.id,
             bike_plate: formData.bikePlate.trim(),
           });
 
-          if (bikerError) throw bikerError;
+          if (bikerError) {
+            console.error('Biker insert error:', bikerError);
+            throw bikerError;
+          }
         }
 
         if (role === 'restaurant') {
@@ -154,7 +147,10 @@ export default function SignUpScreen() {
             longitude: -73.9855,
           });
 
-          if (restaurantError) throw restaurantError;
+          if (restaurantError) {
+            console.error('Restaurant insert error:', restaurantError);
+            throw restaurantError;
+          }
         }
 
         await supabase.auth.signOut();
