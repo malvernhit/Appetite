@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   Image,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Trash2 } from 'lucide-react-native';
@@ -14,37 +16,71 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/
 import { useApp } from '@/context/AppContext';
 import { useThemedColors } from '@/hooks/useThemedColors';
 import Button from '@/components/Button';
-import { mockBiker, mockRestaurants } from '@/data/mockData';
+import { orderService } from '@/services/orderService';
+import { restaurantService } from '@/services/restaurantService';
 
 export default function CartScreen() {
   const router = useRouter();
-  const { cart, removeFromCart, clearCart, setCurrentOrder } = useApp();
+  const { cart, removeFromCart, clearCart, setCurrentOrder, user } = useApp();
   const colors = useThemedColors();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const subtotal = cart.reduce((sum, item) => sum + item.dish.price * item.quantity, 0);
   const deliveryFee = 3.99;
   const total = subtotal + deliveryFee;
 
-  const handleConfirmOrder = () => {
+  const handleConfirmOrder = async () => {
     if (cart.length === 0) return;
+    if (!user) {
+      Alert.alert('Error', 'Please sign in to place an order');
+      return;
+    }
 
-    const restaurant = mockRestaurants.find((r) => r.id === cart[0].dish.restaurantId);
-    if (!restaurant) return;
+    try {
+      setIsProcessing(true);
+      const restaurantId = cart[0].dish.restaurant_id;
+      const restaurant = await restaurantService.getRestaurantById(restaurantId);
 
-    const order = {
-      id: `order-${Date.now()}`,
-      restaurant,
-      items: cart,
-      subtotal,
-      deliveryFee,
-      total,
-      status: 'waiting' as const,
-      timestamp: new Date().toISOString(),
-    };
+      if (!restaurant) {
+        Alert.alert('Error', 'Restaurant not found');
+        return;
+      }
 
-    setCurrentOrder(order);
-    clearCart();
-    router.push('/(tabs)/orders');
+      const orderData = {
+        customer_id: user.id,
+        biker_id: null,
+        restaurant_id: restaurant.id,
+        status: 'pending' as const,
+        subtotal,
+        delivery_fee: deliveryFee,
+        total,
+        delivery_address: 'Current Location',
+        delivery_latitude: null,
+        delivery_longitude: null,
+        notes: '',
+      };
+
+      const createdOrder = await orderService.createOrder(orderData);
+
+      const orderItems = cart.map((item) => ({
+        order_id: createdOrder.id,
+        dish_id: item.dish.id,
+        quantity: item.quantity,
+        price: item.dish.price,
+        notes: item.notes || '',
+      }));
+
+      await orderService.createOrderItems(orderItems);
+
+      setCurrentOrder(createdOrder);
+      clearCart();
+      router.push('/(tabs)/orders');
+    } catch (error) {
+      console.error('Error creating order:', error);
+      Alert.alert('Error', 'Failed to create order. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (cart.length === 0) {
@@ -77,7 +113,7 @@ export default function CartScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {cart.map((item) => (
           <View key={item.dish.id} style={[styles.cartItem, { backgroundColor: colors.card }]}>
-            <Image source={{ uri: item.dish.image }} style={styles.itemImage} />
+            <Image source={{ uri: item.dish.image_url || 'https://images.pexels.com/photos/1410235/pexels-photo-1410235.jpeg' }} style={styles.itemImage} />
             <View style={styles.itemDetails}>
               <Text style={[styles.itemName, { color: colors.text }]}>{item.dish.name}</Text>
               <Text style={styles.itemPrice}>${item.dish.price.toFixed(2)}</Text>
@@ -109,7 +145,12 @@ export default function CartScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-        <Button title="Confirm Order" onPress={handleConfirmOrder} />
+        <Button
+          title={isProcessing ? "Processing..." : "Confirm Order"}
+          onPress={handleConfirmOrder}
+          disabled={isProcessing}
+        />
+        {isProcessing && <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing.md }} />}
       </View>
     </SafeAreaView>
   );

@@ -54,6 +54,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setUser(currentSession?.user ?? null);
 
       if (currentSession?.user) {
+        await ensureUserProfile(currentSession.user);
         await fetchUserMode(currentSession.user.id);
       }
 
@@ -63,6 +64,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setUser(newSession?.user ?? null);
 
           if (newSession?.user) {
+            if (event === 'SIGNED_IN') {
+              await ensureUserProfile(newSession.user);
+            }
             await fetchUserMode(newSession.user.id);
           } else {
             setUserMode('customer');
@@ -77,6 +81,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error initializing auth:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const ensureUserProfile = async (authUser: any) => {
+    try {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      if (!existingUser) {
+        await supabase.from('users').insert([
+          {
+            id: authUser.id,
+            email: authUser.email ?? '',
+            full_name: authUser.user_metadata?.full_name ?? '',
+            phone: authUser.user_metadata?.phone ?? '',
+            user_mode: 'customer',
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error('Error ensuring user profile:', error);
     }
   };
 

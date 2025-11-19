@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MapPin, SlidersHorizontal, X } from 'lucide-react-native';
@@ -18,7 +19,9 @@ import FloatingCartButton from '@/components/FloatingCartButton';
 import Button from '@/components/Button';
 import CoachMark from '@/components/CoachMark';
 import LocationPickerModal from '@/components/LocationPickerModal';
-import { mockRestaurants, mockAddress } from '@/data/mockData';
+import { mockAddress } from '@/data/mockData';
+import { restaurantService } from '@/services/restaurantService';
+import { Restaurant } from '@/types';
 
 type FilterType = 'all' | 'rating' | 'distance' | 'open';
 
@@ -26,13 +29,31 @@ export default function HomeScreen() {
   const router = useRouter();
   const { cart, userMode } = useApp();
   const colors = useThemedColors();
-  const [allRestaurants] = useState(mockRestaurants);
-  const [restaurants, setRestaurants] = useState(mockRestaurants);
+  const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([]);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [showCoachMark, setShowCoachMark] = useState(true);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(mockAddress);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadRestaurants();
+  }, []);
+
+  const loadRestaurants = async () => {
+    try {
+      setIsLoading(true);
+      const data = await restaurantService.getRestaurants();
+      setAllRestaurants(data);
+      setRestaurants(data);
+    } catch (error) {
+      console.error('Error loading restaurants:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -44,10 +65,10 @@ export default function HomeScreen() {
         filtered.sort((a, b) => b.rating - a.rating);
         break;
       case 'distance':
-        filtered.sort((a, b) => a.distance - b.distance);
+        filtered.sort((a, b) => a.latitude - b.latitude);
         break;
       case 'open':
-        filtered = filtered.filter((r) => r.isOpen);
+        filtered = filtered.filter((r) => r.is_open);
         break;
       default:
         break;
@@ -90,13 +111,32 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.title, { color: colors.text }]}>Restaurants Near You</Text>
-        {restaurants.map((restaurant) => (
-          <RestaurantCard
-            key={restaurant.id}
-            restaurant={restaurant}
-            onPress={() => router.push(`/restaurant/${restaurant.id}`)}
-          />
-        ))}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+          </View>
+        ) : restaurants.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.muted }]}>No restaurants available</Text>
+          </View>
+        ) : (
+          restaurants.map((restaurant) => (
+            <RestaurantCard
+              key={restaurant.id}
+              restaurant={{
+                id: restaurant.id,
+                name: restaurant.name,
+                cuisine: restaurant.cuisine,
+                rating: restaurant.rating,
+                distance: 2.5,
+                deliveryTime: restaurant.delivery_time,
+                image: restaurant.image_url || 'https://images.pexels.com/photos/1410235/pexels-photo-1410235.jpeg',
+                isOpen: restaurant.is_open,
+              }}
+              onPress={() => router.push(`/restaurant/${restaurant.id}`)}
+            />
+          ))
+        )}
       </ScrollView>
 
       <FloatingCartButton itemCount={cartItemCount} onPress={() => router.push('/cart')} />
@@ -223,6 +263,19 @@ const styles = StyleSheet.create({
     ...Typography.headline,
     color: Colors.text,
     marginBottom: Spacing.lg,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    ...Typography.body,
   },
   modalOverlay: {
     flex: 1,

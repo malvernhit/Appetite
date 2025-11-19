@@ -35,7 +35,7 @@ export default function DishCard({ dish, onQuantityChange, currentQuantity = 0 }
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card }]}>
-      <Image source={{ uri: dish.image }} style={styles.image} />
+      <Image source={{ uri: dish.image_url || 'https://images.pexels.com/photos/1410235/pexels-photo-1410235.jpeg' }} style={styles.image} />
       <View style={styles.content}>
         <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
           {dish.name}

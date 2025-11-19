@@ -2,11 +2,19 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { Star, Clock, MapPin } from 'lucide-react-native';
 import { Colors, Typography, Shadows, BorderRadius, Spacing } from '@/constants/theme';
-import { Restaurant } from '@/types';
 import { useThemedColors } from '@/hooks/useThemedColors';
 
 interface RestaurantCardProps {
-  restaurant: Restaurant;
+  restaurant: {
+    id: string;
+    name: string;
+    cuisine: string;
+    rating: number;
+    distance: number;
+    deliveryTime: string;
+    image: string;
+    isOpen: boolean;
+  };
   onPress: () => void;
 }
 
