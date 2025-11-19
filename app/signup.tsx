@@ -11,13 +11,13 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Building2, User, Mail, Lock, Phone } from 'lucide-react-native';
+import { User, Mail, Lock, Phone, Bike } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/theme';
 import { useThemedColors } from '@/hooks/useThemedColors';
 import { supabase } from '@/lib/supabase';
 import Button from '@/components/Button';
 
-type UserRole = 'customer' | 'biker' | 'restaurant';
+type UserRole = 'customer' | 'biker';
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -30,9 +30,6 @@ export default function SignUpScreen() {
     password: '',
     phone: '',
     bikePlate: '',
-    restaurantName: '',
-    restaurantAddress: '',
-    cuisine: '',
   });
 
   const getSignUpErrorMessage = (error: any): string => {
@@ -92,21 +89,6 @@ export default function SignUpScreen() {
       return;
     }
 
-    if (role === 'restaurant') {
-      if (!formData.restaurantName.trim()) {
-        Alert.alert('Missing Information', 'Please enter your restaurant name.');
-        return;
-      }
-      if (!formData.restaurantAddress.trim()) {
-        Alert.alert('Missing Information', 'Please enter your restaurant address.');
-        return;
-      }
-      if (!formData.cuisine.trim()) {
-        Alert.alert('Missing Information', 'Please enter your cuisine type.');
-        return;
-      }
-    }
-
     setLoading(true);
 
     try {
@@ -137,25 +119,9 @@ export default function SignUpScreen() {
           }
         }
 
-        if (role === 'restaurant') {
-          const { error: restaurantError } = await supabase.from('restaurants').insert({
-            owner_id: authData.user.id,
-            name: formData.restaurantName.trim(),
-            address: formData.restaurantAddress.trim(),
-            cuisine: formData.cuisine.trim(),
-            latitude: 40.7580,
-            longitude: -73.9855,
-          });
-
-          if (restaurantError) {
-            console.error('Restaurant insert error:', restaurantError);
-            throw restaurantError;
-          }
-        }
-
         await supabase.auth.signOut();
 
-        const roleText = role === 'customer' ? 'customer' : role === 'biker' ? 'biker' : 'restaurant owner';
+        const roleText = role === 'customer' ? 'customer' : 'biker';
         Alert.alert(
           'Welcome!',
           `Your ${roleText} account has been created successfully. You can now sign in.`,
@@ -209,18 +175,18 @@ export default function SignUpScreen() {
             style={[
               styles.roleButton,
               { backgroundColor: colors.card, borderColor: colors.border },
-              role === 'restaurant' && styles.roleButtonActive,
+              role === 'biker' && styles.roleButtonActive,
             ]}
-            onPress={() => setRole('restaurant')}
+            onPress={() => setRole('biker')}
           >
-            <Building2 size={24} color={role === 'restaurant' ? Colors.primary : colors.muted} />
+            <Bike size={24} color={role === 'biker' ? Colors.primary : colors.muted} />
             <Text
               style={[
                 styles.roleButtonText,
-                { color: role === 'restaurant' ? Colors.primary : colors.muted },
+                { color: role === 'biker' ? Colors.primary : colors.muted },
               ]}
             >
-              Restaurant
+              Biker
             </Text>
           </TouchableOpacity>
         </View>
@@ -290,6 +256,7 @@ export default function SignUpScreen() {
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>Bike Plate Number</Text>
               <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Bike size={20} color={colors.muted} />
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
                   placeholder="Enter bike plate number"
@@ -301,50 +268,6 @@ export default function SignUpScreen() {
               </View>
             </View>
           )}
-
-          {role === 'restaurant' && (
-            <>
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Restaurant Name</Text>
-                <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Building2 size={20} color={colors.muted} />
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Enter restaurant name"
-                    placeholderTextColor={colors.muted}
-                    value={formData.restaurantName}
-                    onChangeText={(text) => setFormData({ ...formData, restaurantName: text })}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Restaurant Address</Text>
-                <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Enter restaurant address"
-                    placeholderTextColor={colors.muted}
-                    value={formData.restaurantAddress}
-                    onChangeText={(text) => setFormData({ ...formData, restaurantAddress: text })}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Cuisine Type</Text>
-                <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="e.g., Italian, Chinese, Mexican"
-                    placeholderTextColor={colors.muted}
-                    value={formData.cuisine}
-                    onChangeText={(text) => setFormData({ ...formData, cuisine: text })}
-                  />
-                </View>
-              </View>
-            </>
-          )}
         </View>
 
         <Button
@@ -353,12 +276,6 @@ export default function SignUpScreen() {
           disabled={loading}
           style={styles.signUpButton}
         />
-
-        <TouchableOpacity onPress={() => setRole('biker')} style={styles.bikerLink}>
-          <Text style={[styles.bikerLinkText, { color: colors.muted }]}>
-            I'm a biker
-          </Text>
-        </TouchableOpacity>
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.muted }]}>
@@ -440,15 +357,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
   },
   signUpButton: {
-    marginBottom: Spacing.md,
-  },
-  bikerLink: {
-    alignItems: 'center',
     marginBottom: Spacing.lg,
-  },
-  bikerLinkText: {
-    ...Typography.caption,
-    textDecorationLine: 'underline',
   },
   footer: {
     flexDirection: 'row',

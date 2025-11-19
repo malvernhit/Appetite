@@ -72,23 +72,7 @@ export default function SignInScreen() {
       if (error) throw error;
 
       if (data.user) {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('user_mode')
-          .eq('id', data.user.id)
-          .maybeSingle();
-
-        if (userError) {
-          console.error('Error fetching user mode:', userError);
-          router.replace('/(tabs)');
-          return;
-        }
-
-        if (userData?.user_mode === 'restaurant') {
-          router.replace('/restaurant-dashboard');
-        } else {
-          router.replace('/(tabs)');
-        }
+        router.replace('/(tabs)');
       }
     } catch (error: any) {
       const friendlyMessage = getErrorMessage(error);

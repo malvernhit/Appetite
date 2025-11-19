@@ -3,7 +3,6 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AppProvider, useApp } from '@/context/AppContext';
-import { supabase } from '@/lib/supabase';
 import { useFonts } from 'expo-font';
 import {
   Poppins_400Regular,
@@ -20,41 +19,21 @@ import * as SplashScreen from 'expo-splash-screen';
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
-  const { theme, session, isLoading, user } = useApp();
+  const { theme, session, isLoading } = useApp();
   const router = useRouter();
   const segments = useSegments();
-  const [userMode, setUserMode] = React.useState<string | null>(null);
-
-  useEffect(() => {
-    if (user) {
-      supabase
-        .from('users')
-        .select('user_mode')
-        .eq('id', user.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          setUserMode(data?.user_mode || null);
-        });
-    } else {
-      setUserMode(null);
-    }
-  }, [user]);
 
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'restaurant' || segments[0] === 'restaurant-dashboard' || segments[0] === 'cart' || segments[0] === 'delivery' || segments[0] === 'chat' || segments[0] === 'tracking';
+    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === 'restaurant' || segments[0] === 'cart' || segments[0] === 'delivery' || segments[0] === 'chat' || segments[0] === 'tracking';
 
     if (!session && inAuthGroup) {
       router.replace('/signin');
     } else if (session && (segments[0] === 'signin' || segments[0] === 'signup')) {
-      if (userMode === 'restaurant') {
-        router.replace('/restaurant-dashboard');
-      } else {
-        router.replace('/(tabs)');
-      }
+      router.replace('/(tabs)');
     }
-  }, [session, segments, isLoading, userMode]);
+  }, [session, segments, isLoading]);
 
   return (
     <>
@@ -63,7 +42,6 @@ function RootNavigator() {
         <Stack.Screen name="signup" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="restaurant/[id]" />
-        <Stack.Screen name="restaurant-dashboard" />
         <Stack.Screen name="cart" />
         <Stack.Screen name="delivery" />
         <Stack.Screen name="chat" />
