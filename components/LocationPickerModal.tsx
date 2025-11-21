@@ -16,7 +16,7 @@ import {
   TouchableWithoutFeedback,
 } from "react-native";
 import * as Location from "expo-location";
-import { X, MapPin, Search, Locate } from "lucide-react-native";
+import { X, MapPin, Search, Locate, Navigation } from "lucide-react-native";
 import {
   Colors,
   Typography,
@@ -39,6 +39,13 @@ interface LocationPickerModalProps {
   currentLocation?: string;
 }
 
+interface LocationSuggestion {
+  name: string;
+  description: string;
+  place_id: string;
+  types?: string[];
+}
+
 export default function LocationPickerModal({
   visible,
   onClose,
@@ -47,17 +54,39 @@ export default function LocationPickerModal({
   const colors = useThemedColors();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [googleSuggestions, setGoogleSuggestions] = useState<any[]>([]);
+  const [googleSuggestions, setGoogleSuggestions] = useState<LocationSuggestion[]>([]);
+  const [nearbySuggestions, setNearbySuggestions] = useState<LocationSuggestion[]>([]);
   const [isFetching, setIsFetching] = useState(false);
 
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [isLoadingNearby, setIsLoadingNearby] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<{
     name: string;
     lat: number;
     lng: number;
   } | null>(null);
 
-  // Fetch autocomplete suggestions for Zimbabwe
+  const [userCurrentLocation, setUserCurrentLocation] = useState<{
+    name: string;
+    lat: number;
+    lng: number;
+  } | null>(null);
+
+  // Get user's current location when modal opens
+  useEffect(() => {
+    if (visible) {
+      handleGetCurrentLocation(true);
+    }
+  }, [visible]);
+
+  // Fetch nearby places when user location is available
+  useEffect(() => {
+    if (userCurrentLocation) {
+      fetchNearbyPlaces(userCurrentLocation.lat, userCurrentLocation.lng);
+    }
+  }, [userCurrentLocation]);
+
+  // Fetch autocomplete suggestions
   useEffect(() => {
     if (!searchQuery || searchQuery.length < 2) {
       setGoogleSuggestions([]);
@@ -68,12 +97,17 @@ export default function LocationPickerModal({
       try {
         setIsFetching(true);
 
-        const response = await fetch(
-          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-            searchQuery
-          )}&components=country:zw&key=AIzaSyCyHL9gfX6NVPfX1oKTW0bT3AckztO8278`
-        );
+        // Add location biasing if user location is available
+        let url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+          searchQuery
+        )}&components=country:zw&key=AIzaSyCyHL9gfX6NVPfX1oKTW0bT3AckztO8278`;
 
+        // Bias results towards user's current location if available
+        if (userCurrentLocation) {
+          url += `&location=${userCurrentLocation.lat},${userCurrentLocation.lng}&radius=50000`;
+        }
+
+        const response = await fetch(url);
         const data = await response.json();
 
         if (data.status === "OK") {
@@ -88,23 +122,57 @@ export default function LocationPickerModal({
       }
     };
 
-    fetchSuggestions();
-  }, [searchQuery]);
+    const debounceTimer = setTimeout(fetchSuggestions, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery, userCurrentLocation]);
+
+  // Fetch nearby places
+  const fetchNearbyPlaces = async (lat: number, lng: number) => {
+    try {
+      setIsLoadingNearby(true);
+      
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=15000&key=AIzaSyCyHL9gfX6NVPfX1oKTW0bT3AckztO8278`
+      );
+
+      const data = await response.json();
+
+      if (data.status === "OK") {
+        setNearbySuggestions(
+          data.results.slice(0, 10).map((place: any) => ({
+            name: place.name,
+            description: place.vicinity,
+            place_id: place.place_id,
+            types: place.types,
+          }))
+        );
+      } else {
+        console.log("Nearby places fetch failed:", data);
+      }
+    } catch (error) {
+      console.log("Nearby places error:", error);
+    } finally {
+      setIsLoadingNearby(false);
+    }
+  };
 
   // Get current location
-  const handleUseCurrentLocation = async () => {
-    setIsLoadingLocation(true);
+  const handleGetCurrentLocation = async (isAuto = false) => {
+    if (!isAuto) {
+      setIsLoadingLocation(true);
+    }
 
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
 
       if (status !== "granted") {
-        Alert.alert(
-          "Location Permission Required",
-          "Please enable location access to use your current location.",
-          [{ text: "OK" }]
-        );
-        setIsLoadingLocation(false);
+        if (!isAuto) {
+          Alert.alert(
+            "Location Permission Required",
+            "Please enable location access to use your current location.",
+            [{ text: "OK" }]
+          );
+        }
         return;
       }
 
@@ -117,7 +185,7 @@ export default function LocationPickerModal({
 
       let formattedAddress = "Current Location";
 
-      // Reverse geocode using Expo on native
+      // Reverse geocode to get address name
       try {
         const addresses = await Location.reverseGeocodeAsync({
           latitude,
@@ -130,6 +198,7 @@ export default function LocationPickerModal({
           if (address.street) parts.push(address.street);
           if (address.city) parts.push(address.city);
           if (address.region) parts.push(address.region);
+          if (address.country) parts.push(address.country);
 
           formattedAddress =
             parts.filter(Boolean).join(", ") || "Current Location";
@@ -153,19 +222,52 @@ export default function LocationPickerModal({
         }
       }
 
-      setSelectedLocation({
+      const userLocation = {
         name: formattedAddress,
         lat: latitude,
         lng: longitude,
-      });
+      };
+
+      setUserCurrentLocation(userLocation);
+      
+      // Only set as selected location if manually triggered
+      if (!isAuto) {
+        setSelectedLocation(userLocation);
+      }
+
     } catch (error) {
       console.error("Error getting location:", error);
-      Alert.alert(
-        "Error",
-        "Unable to get your current location. Please try again."
-      );
+      if (!isAuto) {
+        Alert.alert(
+          "Error",
+          "Unable to get your current location. Please try again."
+        );
+      }
     } finally {
-      setIsLoadingLocation(false);
+      if (!isAuto) {
+        setIsLoadingLocation(false);
+      }
+    }
+  };
+
+  const handleSelectSuggestion = async (suggestion: LocationSuggestion) => {
+    try {
+      const details = await fetch(
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${suggestion.place_id}&key=AIzaSyCyHL9gfX6NVPfX1oKTW0bT3AckztO8278`
+      );
+      const detailsData = await details.json();
+      const loc = detailsData.result.geometry.location;
+
+      setSelectedLocation({
+        name: suggestion.description || suggestion.name,
+        lat: loc.lat,
+        lng: loc.lng,
+      });
+      
+      setSearchQuery(suggestion.description || suggestion.name);
+      setGoogleSuggestions([]);
+    } catch (error) {
+      console.log("Place details error:", error);
     }
   };
 
@@ -178,11 +280,14 @@ export default function LocationPickerModal({
       );
       onClose();
       setSelectedLocation(null);
+      setSearchQuery("");
     }
   };
 
   const handleClose = () => {
     setSelectedLocation(null);
+    setSearchQuery("");
+    setGoogleSuggestions([]);
     onClose();
   };
 
@@ -211,6 +316,21 @@ export default function LocationPickerModal({
               <X size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
+
+          {/* Current Location Display */}
+          {userCurrentLocation && (
+            <View style={styles.currentLocationContainer}>
+              <View style={styles.currentLocationHeader}>
+                <Navigation size={16} color={Colors.primary} />
+                <Text style={[styles.currentLocationTitle, { color: colors.text }]}>
+                  Your Current Location
+                </Text>
+              </View>
+              <Text style={[styles.currentLocationText, { color: colors.muted }]}>
+                {userCurrentLocation.name}
+              </Text>
+            </View>
+          )}
 
           {/* Map Preview */}
           {selectedLocation && (
@@ -262,30 +382,61 @@ export default function LocationPickerModal({
             </View>
           )}
 
-          {/* Search */}
-          <View
-            style={[
-              styles.searchContainer,
-              { backgroundColor: colors.background },
-            ]}
-          >
-            <Search size={20} color={colors.muted} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search for a location..."
-              placeholderTextColor={colors.muted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {isFetching && (
-              <ActivityIndicator size="small" color={Colors.primary} />
+          {/* Search with Autocomplete */}
+          <View style={styles.searchSection}>
+            <View
+              style={[
+                styles.searchContainer,
+                { backgroundColor: colors.background },
+              ]}
+            >
+              <Search size={20} color={colors.muted} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder="Search for a location..."
+                placeholderTextColor={colors.muted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {isFetching && (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              )}
+            </View>
+
+            {/* Autocomplete Dropdown */}
+            {googleSuggestions.length > 0 && (
+              <View style={[styles.autocompleteContainer, { backgroundColor: colors.background }]}>
+                <ScrollView 
+                  style={styles.autocompleteList}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {googleSuggestions.map((item, index) => (
+                    <TouchableOpacity
+                      key={item.place_id}
+                      style={[
+                        styles.autocompleteItem,
+                        { borderBottomColor: colors.border },
+                      ]}
+                      onPress={() => handleSelectSuggestion(item)}
+                    >
+                      <MapPin size={16} color={colors.muted} />
+                      <Text
+                        style={[styles.autocompleteText, { color: colors.text }]}
+                        numberOfLines={1}
+                      >
+                        {item.description}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
             )}
           </View>
 
           {/* Current Location Button */}
           <TouchableOpacity
             style={styles.mapButton}
-            onPress={handleUseCurrentLocation}
+            onPress={() => handleGetCurrentLocation(false)}
             disabled={isLoadingLocation}
           >
             <View style={styles.mapButtonContent}>
@@ -312,80 +463,68 @@ export default function LocationPickerModal({
             )}
           </TouchableOpacity>
 
-          {/* Divider */}
-          <View style={styles.divider}>
-            <View
-              style={[
-                styles.dividerLine,
-                { backgroundColor: colors.border },
-              ]}
-            />
-            <Text
-              style={[styles.dividerText, { color: colors.muted }]}
-            >
-              Or select a location
-            </Text>
-            <View
-              style={[
-                styles.dividerLine,
-                { backgroundColor: colors.border },
-              ]}
-            />
-          </View>
-
-          {/* Suggestions List */}
-          <ScrollView
-            style={styles.locationList}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {googleSuggestions.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.locationItem,
-                  { backgroundColor: colors.background },
-                ]}
-                onPress={async () => {
-                  try {
-                    const details = await fetch(
-                      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${item.place_id}&key=AIzaSyCyHL9gfX6NVPfX1oKTW0bT3AckztO8278`
-                    );
-                    const detailsData = await details.json();
-                    const loc = detailsData.result.geometry.location;
-
-                    setSelectedLocation({
-                      name: item.description,
-                      lat: loc.lat,
-                      lng: loc.lng,
-                    });
-                  } catch (error) {
-                    console.log("Place details error:", error);
-                  }
-                }}
-              >
-                <View style={styles.locationIconContainer}>
-                  <MapPin size={20} color={colors.muted} />
-                </View>
-
+          {/* Nearby Locations */}
+          {nearbySuggestions.length > 0 && (
+            <>
+              <View style={styles.divider}>
+                <View
+                  style={[
+                    styles.dividerLine,
+                    { backgroundColor: colors.border },
+                  ]}
+                />
                 <Text
-                  style={[styles.locationText, { color: colors.text }]}
+                  style={[styles.dividerText, { color: colors.text }]}
                 >
-                  {item.description}
+                  Nearby Locations
                 </Text>
-              </TouchableOpacity>
-            ))}
-
-            {googleSuggestions.length === 0 && !isFetching && (
-              <View style={styles.emptyState}>
-                <Text
-                  style={[styles.emptyStateText, { color: colors.muted }]}
-                >
-                  No locations found
-                </Text>
+                <View
+                  style={[
+                    styles.dividerLine,
+                    { backgroundColor: colors.border },
+                  ]}
+                />
               </View>
-            )}
-          </ScrollView>
+
+              <ScrollView
+                style={styles.locationList}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {nearbySuggestions.map((item) => (
+                  <TouchableOpacity
+                    key={item.place_id}
+                    style={[
+                      styles.locationItem,
+                      { backgroundColor: colors.background },
+                    ]}
+                    onPress={() => handleSelectSuggestion(item)}
+                  >
+                    <View style={styles.locationIconContainer}>
+                      <MapPin size={20} color={colors.muted} />
+                    </View>
+
+                    <View style={styles.locationTextContainer}>
+                      <Text
+                        style={[styles.locationText, { color: colors.text }]}
+                      >
+                        {item.name}
+                      </Text>
+                      <Text
+                        style={[styles.locationDescription, { color: colors.muted }]}
+                      >
+                        {item.description}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+
+                {isLoadingNearby && (
+                  <ActivityIndicator size="small" color={Colors.primary} style={styles.loadingIndicator} />
+                )}
+              </ScrollView>
+            </>
+          )}
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -410,7 +549,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: BorderRadius.xl,
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.xxxl,
-    maxHeight: "80%",
+    maxHeight: "90%",
     ...Shadows.floating,
   },
   header: {
@@ -429,6 +568,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  currentLocationContainer: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.primary + "10",
+    borderWidth: 1,
+    borderColor: Colors.primary + "20",
+  },
+  currentLocationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.xs,
+  },
+  currentLocationTitle: {
+    ...Typography.caption,
+    fontWeight: "600",
+    marginLeft: Spacing.xs,
+  },
+  currentLocationText: {
+    ...Typography.body,
+    fontSize: 14,
+  },
+  searchSection: {
+    position: 'relative',
+    zIndex: 1000,
+  },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -437,12 +603,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.primary + "30",
   },
   searchInput: {
     flex: 1,
     marginLeft: Spacing.sm,
     ...Typography.body,
     paddingVertical: Spacing.xs,
+  },
+  autocompleteContainer: {
+    position: 'absolute',
+    top: '100%',
+    left: Spacing.lg,
+    right: Spacing.lg,
+    maxHeight: 200,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.primary + "30",
+    ...Shadows.card,
+    zIndex: 1001,
+  },
+  autocompleteList: {
+    maxHeight: 200,
+  },
+  autocompleteItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  autocompleteText: {
+    flex: 1,
+    marginLeft: Spacing.sm,
+    ...Typography.body,
   },
   mapButton: {
     marginHorizontal: Spacing.lg,
@@ -490,10 +684,12 @@ const styles = StyleSheet.create({
   dividerText: {
     ...Typography.caption,
     marginHorizontal: Spacing.md,
+    fontWeight: "600",
   },
   locationList: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
+    maxHeight: 200,
   },
   locationItem: {
     flexDirection: "row",
@@ -509,10 +705,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  locationText: {
+  locationTextContainer: {
     flex: 1,
     marginLeft: Spacing.sm,
+  },
+  locationText: {
     ...Typography.body,
+    fontWeight: "500",
+    marginBottom: 2,
+  },
+  locationDescription: {
+    ...Typography.caption,
+    fontSize: 12,
+  },
+  loadingIndicator: {
+    marginVertical: Spacing.lg,
   },
   emptyState: {
     padding: Spacing.xl,
@@ -555,4 +762,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-
