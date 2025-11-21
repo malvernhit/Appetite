@@ -65,29 +65,54 @@ export default function LocationPickerModal({
       }
 
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Location.Accuracy.High,
       });
 
-      const [address] = await Location.reverseGeocodeAsync({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
+      const latitude = location.coords.latitude;
+      const longitude = location.coords.longitude;
 
       let formattedAddress = 'Current Location';
-      if (address) {
-        const parts = [];
-        if (address.streetNumber) parts.push(address.streetNumber);
-        if (address.street) parts.push(address.street);
-        if (address.city) parts.push(address.city);
-        if (address.region) parts.push(address.region);
-        if (address.postalCode) parts.push(address.postalCode);
-        formattedAddress = parts.join(', ') || 'Current Location';
+
+      try {
+        const addresses = await Location.reverseGeocodeAsync({
+          latitude,
+          longitude,
+        });
+
+        if (addresses && addresses.length > 0) {
+          const address = addresses[0];
+          const parts = [];
+          if (address.street) parts.push(address.street);
+          if (address.streetNumber) parts.push(address.streetNumber);
+          if (address.district) parts.push(address.district);
+          if (address.city) parts.push(address.city);
+          if (address.region) parts.push(address.region);
+
+          formattedAddress = parts.filter(Boolean).join(', ') || 'Current Location';
+        }
+      } catch (geocodeError) {
+        console.log('Reverse geocoding failed, trying Google Geocoding API:', geocodeError);
+
+        if (Platform.OS === 'web') {
+          try {
+            const response = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=AIzaSyCyHL9gfX6NVPfX1oKTW0bT3AckztO8278`
+            );
+            const data = await response.json();
+
+            if (data.results && data.results.length > 0) {
+              formattedAddress = data.results[0].formatted_address;
+            }
+          } catch (googleGeoError) {
+            console.log('Google Geocoding also failed:', googleGeoError);
+          }
+        }
       }
 
       setSelectedLocation({
         name: formattedAddress,
-        lat: location.coords.latitude,
-        lng: location.coords.longitude,
+        lat: latitude,
+        lng: longitude,
       });
     } catch (error) {
       console.error('Error getting location:', error);
