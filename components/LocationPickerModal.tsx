@@ -20,6 +20,7 @@ import { X, MapPin, Search, Locate } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/theme';
 import { useThemedColors } from '@/hooks/useThemedColors';
 import StaticMapView from './StaticMapView';
+import InteractiveMapView from './InteractiveMapView';
 
 interface LocationPickerModalProps {
   visible: boolean;
@@ -146,13 +147,23 @@ export default function LocationPickerModal({
 
           {selectedLocation && (
             <View style={styles.mapPreviewContainer}>
-              <StaticMapView
-                latitude={selectedLocation.lat}
-                longitude={selectedLocation.lng}
-                width={Dimensions.get('window').width - 48}
-                height={200}
-                zoom={14}
-              />
+              {Platform.OS === 'web' ? (
+                <InteractiveMapView
+                  latitude={selectedLocation.lat}
+                  longitude={selectedLocation.lng}
+                  width={Dimensions.get('window').width - 48}
+                  height={250}
+                  zoom={14}
+                />
+              ) : (
+                <StaticMapView
+                  latitude={selectedLocation.lat}
+                  longitude={selectedLocation.lng}
+                  width={Dimensions.get('window').width - 48}
+                  height={200}
+                  zoom={14}
+                />
+              )}
               <View style={[styles.selectedLocationBadge, { backgroundColor: colors.card }]}>
                 <MapPin size={16} color={Colors.primary} />
                 <Text style={[styles.selectedLocationText, { color: colors.text }]} numberOfLines={2}>
